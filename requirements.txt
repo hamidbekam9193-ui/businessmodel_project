@@ -1,6 +1,6 @@
 fastapi==0.118.0
 uvicorn[standard]==0.37.0
-pydantic==2.11.9
+pydantic>=2.11.9
 python-dotenv==1.1.1
 google-genai==1.39.1
 crewai==0.201.1
