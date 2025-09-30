@@ -1,232 +1,251 @@
-import streamlit as st
-import requests
 import os
+import traceback
+from typing import List, Optional
+
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
 from dotenv import load_dotenv
 
-# --- INITIALIZATION ---
+# Assuming your project structure is correct, this imports the flow from src/main.py
+from src.main import BusinessPlanFlow, BusinessPlanState
 
-# Load environment variables from a .env file if it exists
+# Load environment variables from a .env file if it exists.
+# This is crucial for making API keys available to your application.
 load_dotenv()
 
-# Set page configuration
-st.set_page_config(page_title="Business Plan Creator", page_icon="📊", layout="wide")
+# Initialize the FastAPI application
+app = FastAPI(
+    title="Business Plan Generator API",
+    description="An API to generate a comprehensive business plan using AI agents.",
+    version="1.0.0"
+)
 
-def initialize_session_state():
-    """Initializes all required session state variables in one place."""
-    # --- State and Authentication ---
-    if 'page' not in st.session_state:
-        st.session_state.page = 0  # 0: Login, 1: Page 1, etc.
-    if 'authenticated' not in st.session_state:
-        st.session_state.authenticated = False
-    if 'gemini_api_key' not in st.session_state:
-        st.session_state.gemini_api_key = os.getenv("GEMINI_API_KEY", "")
+# --- HEALTH CHECK ENDPOINT ---
+# This is the essential new part. It handles requests to your root URL.
+@app.get("/")
+def read_root():
+    """
+    Root endpoint for health checks.
+    This tells Render that the service is healthy and responding.
+    """
+    return {"status": "ok", "message": "Business Plan Generator API is running"}
 
-    # --- Form Fields ---
-    form_fields = {
-        "business_name": "", "start_year": "", "business_reason": "", "mission_vision": "",
-        "legal_structure": None, "financial_funding": [], "business_sector": None,
-        "raw_materials_type": None, "industrial_business_type": None, "services_type": None,
-        "durable_goods_type": None, "consumer_goods_type": None, "healthcare_type": None,
-        "financial_sector_type": None, "it_sector_type": None, "utilities_type": None,
-        "culture_type": None, "primary_countries": "", "product_centralisation": None,
-        "characteristics": [], "product_range": None, "end_consumer_characteristics": None,
-        "end_consumer_characteristics_2": [], "product_service_description": "", "segment_name": "",
-        "segment_demographics": "", "segment_characteristics": "", "customer_count": "",
-        "problems_faced": "", "biggest_competitors": "", "competition_intensity": None,
-        "price_comparison": None, "market_type": None, "competitive_parameters": [],
-        "value_propositions": [], "direct_income": None, "primary_revenue": [],
-        "one_time_payments": [], "ongoing_payments": [], "payment_characteristics": [],
-        "package_price": None, "price_negotiation": None, "fixed_prices": [],
-        "dynamic_prices": [], "distribution_channels": [], "purchasing_power": None,
-        "product_related_characteristics": [], "self_service_availability": None,
-        "online_communities_presence": None, "development_process_customer_involvement": None,
-        "after_sale_purchases": None, "personal_assistance_offered": None,
-        "similar_products_switch": None, "general_customer_relation": None,
-        "material_resources": [], "intangible_resources": [], "important_activities": [],
-        "inhouse_activities": [], "outsourced_activities": [], "company_statements": [],
-        "important_strategic_partners": [], "partnership_benefits": [], "other_benefit": "",
-        "company_dependency": None, "cost_intensive_components": [], "team_members": "",
-        "funding_amount": "", "funding_purpose": ""
+# --- DATA MODELS ---
+# Defines the structure of the incoming request from the frontend.
+class BusinessPlanRequest(BaseModel):
+    business_name: str
+    start_year: str
+    business_reason: str
+    mission_vision: str
+    legal_structure: str
+    financial_funding: List[str]
+    business_sector: str
+    product_service_description: str
+    
+    # Business Sector Information
+    raw_materials_type: Optional[str] = ""
+    industrial_business_type: Optional[str] = ""
+    services_type: Optional[str] = ""
+    durable_goods_type: Optional[str] = ""
+    consumer_goods_type: Optional[str] = ""
+    healthcare_type: Optional[str] = ""
+    financial_sector_type: Optional[str] = ""
+    it_sector_type: Optional[str] = ""
+    utilities_type: Optional[str] = ""
+    culture_type: Optional[str] = ""
+    
+    # Market Information
+    primary_countries: str
+    product_centralisation: str
+    product_range: str
+    end_consumer_characteristics: str
+    end_consumer_characteristics_2: List[str]
+
+    # Segmentation Information
+    segment_name: str
+    segment_demographics: str
+    segment_characteristics: str
+    customer_count: str
+    problems_faced: str
+    biggest_competitors: str
+    competition_intensity: str
+    price_comparison: str
+    market_type: str
+    competitive_parameters: List[str]
+    value_propositions: List[str]
+    direct_income: str
+    primary_revenue: List[str]
+    one_time_payments: Optional[List[str]] = []
+    ongoing_payments: Optional[List[str]] = []
+    payment_characteristics: Optional[List[str]] = []
+    package_price: str
+    price_negotiation: str
+    fixed_prices: Optional[List[str]] = []
+    dynamic_prices: Optional[List[str]] = []
+    distribution_channels: List[str]
+    purchasing_power: str
+    product_related_characteristics: List[str]
+    self_service_availability: str
+    online_communities_presence: str
+    development_process_customer_involvement: str
+    after_sale_purchases: str
+    personal_assistance_offered: str
+    similar_products_switch: str
+    general_customer_relation: str
+
+    # Key resources
+    material_resources: List[str]
+    intangible_resources: List[str]
+    important_activities: List[str]
+    inhouse_activities: List[str]
+    outsourced_activities: Optional[List[str]] = []
+
+    # Company statements
+    company_statements: Optional[List[str]] = []
+    
+    # Important strategic partners
+    important_strategic_partners: List[str]
+    partnership_benefits: List[str]
+    other_benefit: Optional[str] = ""
+    company_dependency: str
+    cost_intensive_components: List[str]
+
+    # Team
+    team_members: str
+    funding_amount: str
+    funding_purpose: str
+
+# Defines the structure of the response sent back to the frontend.
+class BusinessPlanResponse(BaseModel):
+    business_plan: str
+
+# --- HELPER FUNCTION ---
+def collect_business_plan_inputs(request: BusinessPlanRequest) -> dict:
+    """
+    Collects and formats the inputs from the frontend request for use in the crew.
+    
+    Args:
+        request (BusinessPlanRequest): The request object containing all user inputs
+        
+    Returns:
+        dict: A dictionary containing all the inputs formatted for use in the crew
+    """
+    def safe_join(lst):
+        """Safely join a list into a string, handling None and empty lists."""
+        return ", ".join(lst) if lst else ""
+
+    # This dictionary structure must match the variables expected by your crew's tasks.
+    inputs = {
+        "business_name": request.business_name,
+        "start_year": request.start_year,
+        "business_reason": request.business_reason,
+        "mission_vision": request.mission_vision,
+        "legal_structure": request.legal_structure,
+        "financial_funding": safe_join(request.financial_funding),
+        "business_sector": request.business_sector,
+        "raw_materials_type": request.raw_materials_type,
+        "industrial_business_type": request.industrial_business_type,
+        "services_type": request.services_type,
+        "durable_goods_type": request.durable_goods_type,
+        "consumer_goods_type": request.consumer_goods_type,
+        "healthcare_type": request.healthcare_type,
+        "financial_sector_type": request.financial_sector_type,
+        "it_sector_type": request.it_sector_type,
+        "utilities_type": request.utilities_type,
+        "culture_type": request.culture_type,
+        "product_service_description": request.product_service_description,
+        "primary_countries": request.primary_countries,
+        "product_centralisation": request.product_centralisation,
+        "product_range": request.product_range,
+        "end_consumer_characteristics": request.end_consumer_characteristics,
+        "end_consumer_characteristics_2": safe_join(request.end_consumer_characteristics_2),
+        "segment_name": request.segment_name,
+        "segment_demographics": request.segment_demographics,
+        "segment_characteristics": request.segment_characteristics,
+        "customer_count": request.customer_count,
+        "problems_faced": request.problems_faced,
+        "biggest_competitors": request.biggest_competitors,
+        "competition_intensity": request.competition_intensity,
+        "price_comparison": request.price_comparison,
+        "market_type": request.market_type,
+        "competitive_parameters": safe_join(request.competitive_parameters),
+        "value_propositions": safe_join(request.value_propositions),
+        "direct_income": request.direct_income,
+        "primary_revenue": safe_join(request.primary_revenue),
+        "one_time_payments": safe_join(request.one_time_payments),
+        "ongoing_payments": safe_join(request.ongoing_payments),
+        "payment_characteristics": safe_join(request.payment_characteristics),
+        "package_price": request.package_price,
+        "price_negotiation": request.price_negotiation,
+        "fixed_prices": safe_join(request.fixed_prices),
+        "dynamic_prices": safe_join(request.dynamic_prices),
+        "distribution_channels": safe_join(request.distribution_channels),
+        "purchasing_power": request.purchasing_power,
+        "product_related_characteristics": safe_join(request.product_related_characteristics),
+        "self_service_availability": request.self_service_availability,
+        "online_communities_presence": request.online_communities_presence,
+        "development_process_customer_involvement": request.development_process_customer_involvement,
+        "after_sale_purchases": request.after_sale_purchases,
+        "personal_assistance_offered": request.personal_assistance_offered,
+        "similar_products_switch": request.similar_products_switch,
+        "general_customer_relation": request.general_customer_relation,
+        "material_resources": safe_join(request.material_resources),
+        "intangible_resources": safe_join(request.intangible_resources),
+        "important_activities": safe_join(request.important_activities),
+        "inhouse_activities": safe_join(request.inhouse_activities),
+        "outsourced_activities": safe_join(request.outsourced_activities),
+        "company_statements": safe_join(request.company_statements),
+        "important_strategic_partners": safe_join(request.important_strategic_partners),
+        "partnership_benefits": safe_join(request.partnership_benefits),
+        "other_benefit": request.other_benefit,
+        "company_dependency": request.company_dependency,
+        "cost_intensive_components": safe_join(request.cost_intensive_components),
+        "team_members": request.team_members,
+        "funding_amount": request.funding_amount,
+        "funding_purpose": request.funding_purpose
     }
-    for key, default_value in form_fields.items():
-        if key not in st.session_state:
-            st.session_state[key] = default_value
+    return inputs
 
-# Call initialization function
-initialize_session_state()
+# --- MAIN API ENDPOINT ---
+@app.post("/generate_business_plan", response_model=BusinessPlanResponse)
+async def generate_business_plan(request: BusinessPlanRequest):
+    """
+    This endpoint receives user inputs and kicks off the AI crew to generate a business plan.
+    """
+    try:
+        print("Received request to generate business plan.")
+        inputs = collect_business_plan_inputs(request)
 
-# --- AUTHENTICATION & LOGIN PAGE ---
+        # The initial state for your crewai flow
+        initial_state = BusinessPlanState(user_inputs=inputs)
 
-def login_page():
-    """Renders the login page and handles authentication."""
-    st.title("Login to Business Plan Creator")
+        flow = BusinessPlanFlow()
 
-    # In production, use a secure database or auth service. This is for demonstration only.
-    VALID_CREDENTIALS = {"admin": "password123"}
-    
-    username = st.text_input("Username")
-    password = st.text_input("Password", type="password")
+        # Asynchronously run the crewai flow
+        state_result = await flow.kickoff_async(initial_state.model_dump())
 
-    # API Key input
-    st.session_state.gemini_api_key = st.text_input(
-        "Gemini API Key",
-        type="password",
-        value=st.session_state.gemini_api_key,
-        help="This is required to generate the business plan."
-    )
-
-    if st.button("Login"):
-        if username in VALID_CREDENTIALS and VALID_CREDENTIALS[username] == password:
-            if st.session_state.gemini_api_key:
-                st.session_state.authenticated = True
-                st.session_state.page = 1  # Move to the first form page
-                st.success("Login successful!")
-                st.rerun()
-            else:
-                st.error("Please provide a valid Gemini API key.")
+        # Process the result from the flow
+        if isinstance(state_result, BaseModel):
+            state_dict = state_result.model_dump()
+        elif isinstance(state_result, dict):
+            state_dict = state_result
         else:
-            st.error("Invalid username or password.")
+            print(f"Unexpected result type: {type(state_result)}")
+            raise ValueError("Flow result is not a dict or Pydantic model")
 
-# --- FORM PAGES ---
+        # Ensure the final business plan is a string
+        bp_value = state_dict.get("business_plan")
+        if isinstance(bp_value, dict) and "raw" in bp_value:
+            state_dict["business_plan"] = bp_value["raw"]
+        
+        final_state = BusinessPlanState(**state_dict)
 
-def page_one():
-    """Renders the first page of the form."""
-    st.header("Part 1: Basic Information and Market Information")
-    st.write("Initially we would like to ask some basic information about the company.")
+        print("Business plan generation complete.")
+        return BusinessPlanResponse(business_plan=final_state.business_plan)
     
-    st.session_state.business_name = st.text_input("What is the name of your company?", value=st.session_state.business_name)
-    st.session_state.start_year = st.text_input("In what year was your company established?", value=st.session_state.start_year)
-    st.session_state.business_reason = st.text_area("Why was your company established? (max 500 chars)", value=st.session_state.business_reason)
-    st.session_state.mission_vision = st.text_area("What is your company's long-term goal or vision?", value=st.session_state.mission_vision)
-
-    legal_options = ["Sole proprietorship", "Private limited company", "General partnership", "Limited partnership", "Public limited company", "Association", "Branch of another company", "Non-profit"]
-    st.session_state.legal_structure = st.radio(
-        "What type of business is your company?",
-        options=legal_options,
-        index=legal_options.index(st.session_state.legal_structure) if st.session_state.legal_structure in legal_options else None
-    )
-
-    st.session_state.financial_funding = st.multiselect(
-        "How is your company currently financed?",
-        options=["Own financing", "Funding from investors", "Bank loan", "Revenue from sales", "Other"],
-        default=st.session_state.financial_funding
-    )
-    
-    sector_options = [
-        "Raw materials (eg mining, steel, trading companies)", "Industrial business (e.g. means of production, transport)",
-        "Services (e.g. commercial and professional services, tourism)", "Durable consumer goods (e.g., furniture, clothing, retail)",
-        "Fast-moving consumer goods (e.g., food, beverages, personal products)", "Healthcare (e.g., healthcare equipment, pharmaceuticals)",
-        "Financial sectors (e.g., banks, insurance)", "Information technology", "Utilities and energy", "Culture and entertainment"
-    ]
-    st.session_state.business_sector = st.radio(
-        "Which industrial sector does your company operate in?",
-        options=sector_options,
-        index=sector_options.index(st.session_state.business_sector) if st.session_state.business_sector in sector_options else None
-    )
-
-    if st.session_state.business_sector == sector_options[0]: # Raw materials
-        raw_materials_options = ["Mining", "Steel", "Trading", "Other"]
-        st.session_state.raw_materials_type = st.radio(
-            "Specify type:", options=raw_materials_options,
-            index=raw_materials_options.index(st.session_state.raw_materials_type) if st.session_state.raw_materials_type in raw_materials_options else None
-        )
-    
-    # ... Add other conditional sector questions here using the same fixed radio button logic ...
-
-    st.session_state.primary_countries = st.text_input("In which countries does your company primarily operate?", value=st.session_state.primary_countries)
-    # ... Continue with other questions for Page 1 ...
-    st.session_state.product_service_description = st.text_area("Describe your products or services:", value=st.session_state.product_service_description)
-
-def page_two():
-    """Renders the second page of the form."""
-    st.header("Part 2: Segmentation and Revenue Information")
-    st.session_state.segment_name = st.text_input("Name of the most relevant customer segment:", value=st.session_state.segment_name)
-    # ... Add all other questions for Page 2 here ...
-    
-def page_three():
-    """Renders the third page of the form."""
-    st.header("Part 3: Resources, Partners, and Team")
-    st.session_state.material_resources = st.multiselect("Material resources:", options=["Equipment", "Facilities", "Inventory", "Other"], default=st.session_state.material_resources)
-    # ... Add all other questions for Page 3 here ...
-    
-    # Place the generate button at the end of the last page
-    if st.button("Generate Business Plan"):
-        generate_business_plan()
-
-# --- DATA SUBMISSION ---
-
-def generate_business_plan():
-    """Collects all data and sends it to the backend API."""
-    with st.spinner("🧠 Generating your business plan... This may take a few minutes."):
-        try:
-            # Collect all data from session state into a dictionary
-            data = {key: st.session_state[key] for key in st.session_state if key not in ['page', 'authenticated', 'gemini_api_key']}
-            
-            # Best Practice: Pass the API key in a secure header, not as an environment variable.
-            # However, sticking to the original logic, we ensure the backend can access it.
-            # The backend should be configured to read this key.
-            os.environ["GEMINI_API_KEY"] = st.session_state.gemini_api_key
-
-            # Get backend URL from environment variables for flexibility
-            backend_url = os.getenv("BACKEND_URL", "http://localhost:8000/generate_business_plan")
-            if "your-app-name.onrender.com" in backend_url:
-                st.warning("Please set your BACKEND_URL environment variable.")
-
-            response = requests.post(
-                backend_url,
-                json=data,
-                timeout=300  # 5-minute timeout for long AI generation
-            )
-
-            if response.status_code == 200:
-                result = response.json()
-                business_plan_markdown = result.get("business_plan", "Error: No business plan found in response.")
-                
-                st.markdown("---")
-                st.header("Generated Business Plan")
-                st.markdown(business_plan_markdown, unsafe_allow_html=True)
-                st.success("✅ Business Plan ready!")
-
-                st.download_button(
-                    label="Download Business Plan",
-                    data=business_plan_markdown,
-                    file_name="generated_business_plan.md",
-                    mime="text/markdown"
-                )
-            else:
-                st.error(f"Error from server (Status {response.status_code}): {response.text}")
-
-        except requests.exceptions.RequestException as e:
-            st.error(f"Error connecting to the server: {e}")
-        except Exception as e:
-            st.error(f"An unexpected error occurred: {e}")
-
-# --- MAIN APP ROUTER ---
-
-if not st.session_state.authenticated:
-    login_page()
-else:
-    st.title("Business Plan Creator")
-
-    # Navigation buttons
-    col1, col2 = st.columns([1, 1])
-    with col1:
-        if st.session_state.page > 1:
-            if st.button("⬅️ Previous Page"):
-                st.session_state.page -= 1
-                st.rerun()
-    with col2:
-        if st.session_state.page < 3:
-            if st.button("Next Page ➡️"):
-                st.session_state.page += 1
-                st.rerun()
-    
-    st.markdown("---")
-
-    # Page router
-    if st.session_state.page == 1:
-        page_one()
-    elif st.session_state.page == 2:
-        page_two()
-    elif st.session_state.page == 3:
-        page_three()
+    except Exception as e:
+        # Log the full error for debugging
+        print(f"An error occurred: {e}")
+        print(traceback.format_exc())
+        # Return a meaningful error to the frontend
+        raise HTTPException(status_code=500, detail=f"An internal error occurred: {str(e)}")
