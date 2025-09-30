@@ -109,12 +109,13 @@ def page_three():
 
 # --- DATA SUBMISSION LOGIC ---
 
+# in app.py
+
 def generate_business_plan():
     """Collects data from session_state and calls the backend API."""
     with st.spinner("🧠 Generating your business plan... This may take a few minutes."):
         try:
             # This is the URL of your deployed backend service on Render
-            # It's best practice to set this as an Environment Variable in Render
             backend_url = os.getenv("BACKEND_URL")
             if not backend_url:
                 st.error("Configuration error: BACKEND_URL is not set.")
@@ -132,7 +133,7 @@ def generate_business_plan():
             if response.status_code == 200:
                 result = response.json()
                 business_plan = result.get("business_plan", "Error: No business plan in response.")
-                
+
                 st.markdown("---")
                 st.header("Generated Business Plan")
                 st.markdown(business_plan, unsafe_allow_html=True)
