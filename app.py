@@ -1,4 +1,4 @@
-```python
+
 import streamlit as st
 import requests
 
@@ -565,4 +565,4 @@ if st.session_state.page == 3 and st.button("Generate Business Plan"):
                 st.error(f"Error: {response.text}")
         except Exception as e:
             st.error(f"Error connecting to the server: {str(e)}")
-```
+
