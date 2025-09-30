@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from typing import List,  Optional
 import os
 import traceback
-from google import genai
+# from google import genai
 from dotenv import load_dotenv
 
 from src.main import BusinessPlanFlow, BusinessPlanState
@@ -11,8 +11,8 @@ from src.main import BusinessPlanFlow, BusinessPlanState
 app = FastAPI()
 
 load_dotenv()
-api_key = os.getenv("GEMINI_API_KEY")
-genai.configure(api_key=api_key)
+# api_key = os.getenv("GEMINI_API_KEY")
+# genai.configure(api_key=api_key)
 
 class BusinessPlanRequest(BaseModel):
     business_name: str
@@ -219,5 +219,6 @@ async def generate_business_plan(request: BusinessPlanRequest):
     except Exception as e:
         print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e))
+
 
 
