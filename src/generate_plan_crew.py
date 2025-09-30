@@ -37,8 +37,8 @@ load_env_from_project_root()
 class GeneratePlanCrew():
     """GeneratePlanCrew crew"""
 
-    agents_config = 'config/agents.yaml'
-    tasks_config = 'config/tasks.yaml'
+    agents_config = 'src/agents.yaml'
+    tasks_config = 'src/tasks.yaml'
 
     @property
     def llm_gemini(self):
@@ -230,4 +230,5 @@ class GeneratePlanCrew():
             return result
         except Exception as e:
             raise Exception(f"Error while running the crew: {e}")
+
 
