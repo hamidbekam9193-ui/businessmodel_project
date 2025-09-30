@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from typing import List,  Optional
 import os
 import traceback
-import google.generativeai as genai
+from google import genai
 from dotenv import load_dotenv
 
 from business_plan_flow.src.business_plan_flow.main import BusinessPlanFlow, BusinessPlanState
@@ -219,3 +219,4 @@ async def generate_business_plan(request: BusinessPlanRequest):
     except Exception as e:
         print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e))
+
