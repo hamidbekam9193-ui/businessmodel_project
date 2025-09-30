@@ -3,7 +3,7 @@ from crewai.project import CrewBase, agent, crew, task, before_kickoff
 import os
 from dotenv import load_dotenv
 
-from business_plan_flow.src.business_plan_flow.tools.CharacterCounterTool import CharacterCounterTool
+from .tools.CharacterCounterTool import CharacterCounterTool
 
 from pathlib import Path
 
@@ -230,3 +230,4 @@ class GeneratePlanCrew():
             return result
         except Exception as e:
             raise Exception(f"Error while running the crew: {e}")
+
