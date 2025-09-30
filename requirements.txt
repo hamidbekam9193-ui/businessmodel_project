@@ -1,7 +1,6 @@
-fastapi
-uvicorn
-streamlit
-requests
-python-dotenv
-google-genai
-crewai
+fastapi==0.118.0
+uvicorn[standard]==0.37.0
+pydantic>=2.11.9
+python-dotenv==1.1.1
+google-genai==1.39.1
+crewai==0.35.0  # <-- Updated version
