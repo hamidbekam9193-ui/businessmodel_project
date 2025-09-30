@@ -10,7 +10,6 @@ from dotenv import load_dotenv
 from src.main import BusinessPlanFlow, BusinessPlanState
 
 # Load environment variables from a .env file if it exists.
-# This is crucial for making API keys available to your application.
 load_dotenv()
 
 # Initialize the FastAPI application
@@ -21,25 +20,20 @@ app = FastAPI(
 )
 
 # --- HEALTH CHECK ENDPOINT ---
-# This is the essential new part. It handles requests to your root URL.
 @app.get("/")
 def read_root():
-    """
-    Root endpoint for health checks.
-    This tells Render that the service is healthy and responding.
-    """
+    """Root endpoint for health checks."""
     return {"status": "ok", "message": "Business Plan Generator API is running"}
 
-# --- DATA MODELS ---
-# Defines the structure of the incoming request from the frontend.
+# --- DATA MODELS (FULLY CORRECTED) ---
 class BusinessPlanRequest(BaseModel):
     business_name: str
     start_year: str
     business_reason: str
     mission_vision: str
-    legal_structure: str
+    legal_structure: Optional[str] = ""
     financial_funding: List[str]
-    business_sector: str
+    business_sector: Optional[str] = ""
     product_service_description: str
     
     # Business Sector Information
@@ -56,9 +50,9 @@ class BusinessPlanRequest(BaseModel):
     
     # Market Information
     primary_countries: str
-    product_centralisation: str
-    product_range: str
-    end_consumer_characteristics: str
+    product_centralisation: Optional[str] = ""
+    product_range: Optional[str] = ""
+    end_consumer_characteristics: Optional[str] = ""
     end_consumer_characteristics_2: List[str]
 
     # Segmentation Information
@@ -68,30 +62,33 @@ class BusinessPlanRequest(BaseModel):
     customer_count: str
     problems_faced: str
     biggest_competitors: str
-    competition_intensity: str
-    price_comparison: str
-    market_type: str
+    competition_intensity: Optional[str] = ""
+    price_comparison: Optional[str] = ""
+    market_type: Optional[str] = ""
     competitive_parameters: List[str]
     value_propositions: List[str]
-    direct_income: str
+    
+    # --- Start of New Changes ---
+    direct_income: Optional[str] = ""
     primary_revenue: List[str]
     one_time_payments: Optional[List[str]] = []
     ongoing_payments: Optional[List[str]] = []
     payment_characteristics: Optional[List[str]] = []
-    package_price: str
-    price_negotiation: str
+    package_price: Optional[str] = ""
+    price_negotiation: Optional[str] = ""
     fixed_prices: Optional[List[str]] = []
     dynamic_prices: Optional[List[str]] = []
     distribution_channels: List[str]
-    purchasing_power: str
+    purchasing_power: Optional[str] = ""
     product_related_characteristics: List[str]
-    self_service_availability: str
-    online_communities_presence: str
-    development_process_customer_involvement: str
-    after_sale_purchases: str
-    personal_assistance_offered: str
-    similar_products_switch: str
-    general_customer_relation: str
+    self_service_availability: Optional[str] = ""
+    online_communities_presence: Optional[str] = ""
+    development_process_customer_involvement: Optional[str] = ""
+    after_sale_purchases: Optional[str] = ""
+    personal_assistance_offered: Optional[str] = ""
+    similar_products_switch: Optional[str] = ""
+    general_customer_relation: Optional[str] = ""
+    # --- End of New Changes ---
 
     # Key resources
     material_resources: List[str]
@@ -107,7 +104,7 @@ class BusinessPlanRequest(BaseModel):
     important_strategic_partners: List[str]
     partnership_benefits: List[str]
     other_benefit: Optional[str] = ""
-    company_dependency: str
+    company_dependency: Optional[str] = ""
     cost_intensive_components: List[str]
 
     # Team
@@ -123,19 +120,13 @@ class BusinessPlanResponse(BaseModel):
 def collect_business_plan_inputs(request: BusinessPlanRequest) -> dict:
     """
     Collects and formats the inputs from the frontend request for use in the crew.
-    
-    Args:
-        request (BusinessPlanRequest): The request object containing all user inputs
-        
-    Returns:
-        dict: A dictionary containing all the inputs formatted for use in the crew
     """
     def safe_join(lst):
         """Safely join a list into a string, handling None and empty lists."""
         return ", ".join(lst) if lst else ""
 
-    # This dictionary structure must match the variables expected by your crew's tasks.
     inputs = {
+        # ... (all your other fields will be collected correctly) ...
         "business_name": request.business_name,
         "start_year": request.start_year,
         "business_reason": request.business_reason,
