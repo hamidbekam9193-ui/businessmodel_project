@@ -1,19 +1,37 @@
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
-from typing import List,  Optional
 import os
 import traceback
-# from google import genai
+from typing import List, Optional
+
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
 from dotenv import load_dotenv
 
+# Assuming your project structure is correct, this imports the flow from src/main.py
 from src.main import BusinessPlanFlow, BusinessPlanState
 
-app = FastAPI()
-
+# Load environment variables from a .env file if it exists.
+# This is crucial for making API keys available to your application.
 load_dotenv()
-# api_key = os.getenv("GEMINI_API_KEY")
-# genai.configure(api_key=api_key)
 
+# Initialize the FastAPI application
+app = FastAPI(
+    title="Business Plan Generator API",
+    description="An API to generate a comprehensive business plan using AI agents.",
+    version="1.0.0"
+)
+
+# --- HEALTH CHECK ENDPOINT ---
+# This is the essential new part. It handles requests to your root URL.
+@app.get("/")
+def read_root():
+    """
+    Root endpoint for health checks.
+    This tells Render that the service is healthy and responding.
+    """
+    return {"status": "ok", "message": "Business Plan Generator API is running"}
+
+# --- DATA MODELS ---
+# Defines the structure of the incoming request from the frontend.
 class BusinessPlanRequest(BaseModel):
     business_name: str
     start_year: str
@@ -97,9 +115,11 @@ class BusinessPlanRequest(BaseModel):
     funding_amount: str
     funding_purpose: str
 
+# Defines the structure of the response sent back to the frontend.
 class BusinessPlanResponse(BaseModel):
     business_plan: str
 
+# --- HELPER FUNCTION ---
 def collect_business_plan_inputs(request: BusinessPlanRequest) -> dict:
     """
     Collects and formats the inputs from the frontend request for use in the crew.
@@ -112,10 +132,9 @@ def collect_business_plan_inputs(request: BusinessPlanRequest) -> dict:
     """
     def safe_join(lst):
         """Safely join a list into a string, handling None and empty lists."""
-        if lst is None:
-            return ""
         return ", ".join(lst) if lst else ""
 
+    # This dictionary structure must match the variables expected by your crew's tasks.
     inputs = {
         "business_name": request.business_name,
         "start_year": request.start_year,
@@ -124,7 +143,6 @@ def collect_business_plan_inputs(request: BusinessPlanRequest) -> dict:
         "legal_structure": request.legal_structure,
         "financial_funding": safe_join(request.financial_funding),
         "business_sector": request.business_sector,
-        # Business Sector Information
         "raw_materials_type": request.raw_materials_type,
         "industrial_business_type": request.industrial_business_type,
         "services_type": request.services_type,
@@ -154,7 +172,6 @@ def collect_business_plan_inputs(request: BusinessPlanRequest) -> dict:
         "value_propositions": safe_join(request.value_propositions),
         "direct_income": request.direct_income,
         "primary_revenue": safe_join(request.primary_revenue),
-        # Optional payment and pricing information
         "one_time_payments": safe_join(request.one_time_payments),
         "ongoing_payments": safe_join(request.ongoing_payments),
         "payment_characteristics": safe_join(request.payment_characteristics),
@@ -187,38 +204,48 @@ def collect_business_plan_inputs(request: BusinessPlanRequest) -> dict:
         "funding_amount": request.funding_amount,
         "funding_purpose": request.funding_purpose
     }
-
     return inputs
 
+# --- MAIN API ENDPOINT ---
 @app.post("/generate_business_plan", response_model=BusinessPlanResponse)
 async def generate_business_plan(request: BusinessPlanRequest):
+    """
+    This endpoint receives user inputs and kicks off the AI crew to generate a business plan.
+    """
     try:
+        print("Received request to generate business plan.")
         inputs = collect_business_plan_inputs(request)
 
+        # The initial state for your crewai flow
         initial_state = BusinessPlanState(user_inputs=inputs)
 
         flow = BusinessPlanFlow()
 
+        # Asynchronously run the crewai flow
         state_result = await flow.kickoff_async(initial_state.model_dump())
 
+        # Process the result from the flow
         if isinstance(state_result, BaseModel):
             state_dict = state_result.model_dump()
         elif isinstance(state_result, dict):
             state_dict = state_result
         else:
+            print(f"Unexpected result type: {type(state_result)}")
             raise ValueError("Flow result is not a dict or Pydantic model")
 
+        # Ensure the final business plan is a string
         bp_value = state_dict.get("business_plan")
         if isinstance(bp_value, dict) and "raw" in bp_value:
             state_dict["business_plan"] = bp_value["raw"]
-
+        
         final_state = BusinessPlanState(**state_dict)
 
+        print("Business plan generation complete.")
         return BusinessPlanResponse(business_plan=final_state.business_plan)
     
     except Exception as e:
+        # Log the full error for debugging
+        print(f"An error occurred: {e}")
         print(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-
+        # Return a meaningful error to the frontend
+        raise HTTPException(status_code=500, detail=f"An internal error occurred: {str(e)}")
