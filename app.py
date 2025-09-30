@@ -680,9 +680,10 @@ if st.session_state.authenticated:
                     # Set the Gemini API key in the environment for the backend
                     os.environ["GEMINI_API_KEY"] = st.session_state.gemini_api_key
 
-                    response = requests.post(
-                        "http://localhost:8000/generate_business_plan",
-                        json=data
+                   response = requests.post(
+                      "https://your-app-name.onrender.com/generate_business_plan",  # Your Render URL
+                       json=data,
+                       timeout=300  # Optional: Increase timeout for long AI generations (5 min)
                     )
 
                     if response.status_code == 200:
