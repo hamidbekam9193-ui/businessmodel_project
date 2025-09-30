@@ -62,6 +62,8 @@ def login_page():
     """Renders the login page and handles authentication."""
     st.title("Login to Business Plan Creator")
 
+    # The user provides the key, which is stored in the session state.
+    # We no longer need VALID_CREDENTIALS if the key is the authentication method.
     st.session_state.gemini_api_key = st.text_input(
         "Enter Your Gemini API Key to Proceed", type="password", value=st.session_state.gemini_api_key,
         help="Required to power the AI agents that generate your business plan."
@@ -69,8 +71,7 @@ def login_page():
 
     if st.button("Login"):
         if st.session_state.gemini_api_key:
-            # Simple check to see if the key looks plausible (starts with 'AIza')
-            # This is not a validation, just a basic UX check.
+            # A simple check to see if the key looks plausible.
             if st.session_state.gemini_api_key.startswith("AIza"):
                 st.session_state.authenticated = True
                 st.session_state.page = 1
