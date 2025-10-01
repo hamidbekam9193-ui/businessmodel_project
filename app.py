@@ -50,7 +50,8 @@ def initialize_session_state():
         "similar_products_switch": None, "general_customer_relation": None,
         "material_resources": [], "intangible_resources": [], "important_activities": [],
         "inhouse_activities": [], "outsourced_activities": [], "company_statements": [],
-        "important_strategic_partners": [], "partnership_benefits": [], "other_benefit": "",
+        "important_strategic_partners": "", # CHANGED: Default for text_area should be string
+        "partnership_benefits": [], "other_benefit": "",
         "company_dependency": None, "cost_intensive_components": [], "team_members": "",
         "funding_amount": "", "funding_purpose": ""
     }
@@ -325,7 +326,8 @@ def page_three():
         options=company_statements_options,
         default=st.session_state.company_statements
     )
-    st.session_state.important_strategic_partners = st.text_area("Important Strategic Partners", st.session_state.important_strategic_partners)
+    # This remains a text_area but its data will be processed before sending
+    st.session_state.important_strategic_partners = st.text_area("Important Strategic Partners (separate with commas)", st.session_state.important_strategic_partners)
     partnership_benefits_options = ["Optimization & Economy", "Reduction of Risk & Uncertainty", "Acquisition of Particular Resources & Activities"]
     st.session_state.partnership_benefits = st.multiselect(
         "Partnership Benefits",
@@ -370,10 +372,21 @@ def generate_business_plan():
             data['gemini_api_key'] = st.session_state.gemini_api_key
             data['groq_api_key'] = st.session_state.groq_api_key
 
+            # --- CRITICAL FIX: Process 'important_strategic_partners' from string to list ---
+            if isinstance(data['important_strategic_partners'], str) and data['important_strategic_partners']:
+                # Split by comma, strip whitespace from each item, and filter out empty strings
+                processed_partners = [
+                    p.strip() for p in data['important_strategic_partners'].split(',') if p.strip()
+                ]
+                data['important_strategic_partners'] = processed_partners
+            else:
+                data['important_strategic_partners'] = [] # Ensure it's an empty list if no input or not a string
+            # --- END CRITICAL FIX ---
+
 
             response = requests.post(
                 f"{backend_url}/generate_business_plan", # Append the endpoint path
-                json=data,
+                json=data, # 'data' now contains 'important_strategic_partners' as a list
                 timeout=300  # 5-minute timeout for potentially long AI responses
             )
 
