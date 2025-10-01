@@ -169,4 +169,78 @@ class GeneratePlanCrew():
         )
 
     @task
-    def create_
+    def create_product_design(self) -> Task:
+        return Task(
+            config=self.tasks_config['create_product_design'],
+            context=[self.create_business_concept()]
+        )
+
+    @task
+    def create_market_analysis(self) -> Task:
+        return Task(
+            config=self.tasks_config['create_market_analysis'],
+            context=[self.create_business_concept(), self.create_product_design()]
+        )
+
+    @task
+    def create_marketing_plan(self) -> Task:
+        return Task(
+            config=self.tasks_config['create_marketing_plan'],
+            context=[self.create_business_concept(), self.create_product_design(), self.create_market_analysis()]
+        )
+
+    @task
+    def create_operating_plan(self) -> Task:
+        return Task(
+            config=self.tasks_config['create_operating_plan'],
+            context=[self.create_business_concept(), self.create_product_design(), self.create_market_analysis(), self.create_marketing_plan()]
+        )
+
+    @task
+    def create_financial_plan(self) -> Task:
+        return Task(
+            config=self.tasks_config['create_financial_plan'],
+            context=[self.create_business_concept(), self.create_product_design(), self.create_market_analysis(), self.create_marketing_plan(), self.create_operating_plan()]
+        )
+
+    @task
+    def consolidate_plan(self) -> Task:
+        return Task(
+            config=self.tasks_config['consolidate_plan'],
+            context=[self.create_business_concept(), self.create_product_design(), self.create_market_analysis(), self.create_marketing_plan(), self.create_operating_plan(), self.create_financial_plan()]
+        )
+
+    @task
+    def evaluate_plan(self) -> Task:
+        return Task(
+            config=self.tasks_config['evaluate_plan'],
+            context=[self.consolidate_plan()]
+        )
+
+    @task
+    def refine_plan(self) -> Task:
+        return Task(
+            config=self.tasks_config['refine_plan'],
+            context=[self.consolidate_plan(), self.evaluate_plan()]
+        )
+
+    @crew
+    def crew(self) -> Crew:
+        """Creates the GeneratePlanCrew crew"""
+        # Ensure LLMs are initialized by accessing their properties
+        _ = self.llm_gemini
+        _ = self.llm_groq
+
+        return Crew(
+            agents=self.agents,
+            tasks=self.tasks,
+            process=Process.sequential,
+            verbose=True
+        )
+
+    def run(self, inputs: dict = None):
+        try:
+            result = self.crew().kickoff(inputs=inputs)
+            return result
+        except Exception as e:
+            raise Exception(f"Error while running the crew: {e}")
