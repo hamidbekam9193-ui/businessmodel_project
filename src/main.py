@@ -2,7 +2,6 @@
 
 #!/usr/bin/env python
 import os
-# from google import genai
 from typing import Optional, List, Dict
 from dotenv import load_dotenv # Still good for local testing, though Render uses its own env vars
 from pydantic import BaseModel
@@ -11,6 +10,14 @@ from crewai.flow import Flow, listen, start, router
 
 from .generate_plan_crew import GeneratePlanCrew
 # from .crews.review_plan_crew.review_plan_crew import ReviewPlanCrew
+
+# This import is not directly used in this file for the `genai` module,
+# but if `google.generativeai` was used directly for API key configuration
+# or other purposes outside of the `GeneratePlanCrew` class, it would need
+# to be updated to `from google import genai`.
+# For now, it's commented out as its usage is encapsulated within `GeneratePlanCrew`.
+# from google import genai 
+
 
 class BusinessPlanState(BaseModel):
     user_inputs: Dict = {}
@@ -60,4 +67,3 @@ class BusinessPlanFlow(Flow[BusinessPlanState]):
     #@listen("completed")
     #def save_business_plan(self):
     #    return self.state
-
