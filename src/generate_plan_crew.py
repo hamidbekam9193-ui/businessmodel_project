@@ -43,41 +43,23 @@ class GeneratePlanCrew():
         return self._llm_gemini
 
     @property
-    def llm_groq(self):
-        if not self._llm_groq: # Check if already initialized
-            if not self._groq_api_key:
-                raise ValueError("Groq API key not provided to GeneratePlanCrew.")
-            # For Groq, the API key can be set via an environment variable
-            # or passed directly to the client. CrewAI's LLM wrapper handles this
-            # by looking at the GROQ_API_KEY environment variable.
-            # So, we temporarily set it here before LLM initialization if it's not already set
-            # or if we want to ensure the dynamic key is used.
-            # A cleaner way is to ensure CrewAI's Groq LLM uses it when passed as argument.
-            # Let's ensure it's set in the environment for the LLM to pick it up.
-            # Or, if CrewAI LLM supports passing it directly:
-            # from crewai_tools.llms import Groq  # Example if using crewai-tools
-            # self._llm_groq = Groq(groq_api_key=self._groq_api_key, model_name="llama-3.3-70b-versatile")
+import google.generativeai as genai # Assuming this is handled or a separate import for Groq is needed
+from langchain_groq import ChatGroq # <--- ADD THIS IMPORT
 
-            # For the generic CrewAI LLM, it usually expects env vars.
-            # Set the environment variable just for this context if not already set.
-            original_groq_api_key = os.environ.get("GROQ_API_KEY")
-            if original_groq_api_key != self._groq_api_key:
-                 os.environ["GROQ_API_KEY"] = self._groq_api_key
+@property
+def llm_groq(self):
+    if not self._llm_groq:
+        if not self._groq_api_key:
+            raise ValueError("Groq API key not provided to GeneratePlanCrew.")
 
-            self._llm_groq = LLM(
-                model="groq/llama-3.3-70b-versatile",
-                temperature=0.1,
-                reasoning_effort="medium"
-            )
-            # Restore original if changed for this instance
-            if original_groq_api_key != self._groq_api_key:
-                if original_groq_api_key is not None:
-                    os.environ["GROQ_API_KEY"] = original_groq_api_key
-                else:
-                    del os.environ["GROQ_API_KEY"] # Clean up if it wasn't there before
-
-        return self._llm_groq
-
+        # Directly instantiate ChatGroq from langchain_groq
+        self._llm_groq = ChatGroq(
+            temperature=0.1,
+            groq_api_key=self._groq_api_key, # <--- Pass the key directly here
+            model_name="llama-3.3-70b-versatile" # Use model_name for ChatGroq
+        )
+    return self._llm_groq
+    
     @before_kickoff
     def before_kickoff_function(self, inputs):
         # inputs here will contain the user-provided form data, but NOT the API keys
@@ -244,3 +226,4 @@ class GeneratePlanCrew():
             return result
         except Exception as e:
             raise Exception(f"Error while running the crew: {e}")
+
