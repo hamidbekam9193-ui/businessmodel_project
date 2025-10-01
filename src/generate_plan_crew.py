@@ -7,9 +7,11 @@ import yaml
 
 # external LLM libraries (optional imports handled during runtime)
 try:
-    import google.generativeai as genai
+    from google import genai
+    from google.genai import types # Import types for configuration
 except Exception:
     genai = None
+    types = None # Set types to None if genai is not available
 
 try:
     from langchain_groq import ChatGroq
@@ -73,16 +75,18 @@ class GeneratePlanCrew:
         if self._llm_gemini is None:
             if not self._gemini_api_key:
                 raise ValueError("Gemini API key not provided to GeneratePlanCrew.")
-            if genai is None:
+            if genai is None or types is None:
                 raise ImportError("google.generativeai is not installed or could not be imported.")
-            # configure google generativeai
-            genai.configure(api_key=self._gemini_api_key)
+
+            # Create a single client object for the new SDK
+            genai_client = genai.Client(api_key=self._gemini_api_key)
 
             # create crewai LLM object for Gemini (model string based on user's choice)
             self._llm_gemini = LLM(
-                model="gemini/gemini-2.5-pro-preview-05-06",
+                model="gemini/gemini-2.5-pro-preview-05-06", # This model string might need adjustment based on crewai's expected format for the new SDK
                 temperature=0.1,
-                reasoning_effort="high"
+                reasoning_effort="high",
+                client=genai_client # Pass the initialized client to the LLM
             )
         return self._llm_gemini
 
