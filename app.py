@@ -1,3 +1,5 @@
+# --- START OF FILE app.py ---
+
 import streamlit as st
 import requests
 import os
@@ -18,8 +20,11 @@ def initialize_session_state():
         st.session_state.page = 0  # 0: Login, 1: Page 1, etc.
     if 'authenticated' not in st.session_state:
         st.session_state.authenticated = False
+    # Fetch API keys from environment first, then allow user input
     if 'gemini_api_key' not in st.session_state:
         st.session_state.gemini_api_key = os.getenv("GEMINI_API_KEY", "")
+    if 'groq_api_key' not in st.session_state:
+        st.session_state.groq_api_key = os.getenv("GROQ_API_KEY", "")
 
     # --- Form Fields ---
     # This dictionary makes it easy to add or change default values.
@@ -62,147 +67,286 @@ def login_page():
     """Renders the login page and handles authentication."""
     st.title("Login to Business Plan Creator")
 
-    # The user provides the key, which is stored in the session state.
-    # We no longer need VALID_CREDENTIALS if the key is the authentication method.
+    # In production, use a secure database or auth service. This is for demonstration.
+    VALID_CREDENTIALS = {"admin": "password123"}
+
+    username = st.text_input("Username", value="admin")
+    password = st.text_input("Password", type="password", value="password123")
+
     st.session_state.gemini_api_key = st.text_input(
-        "Enter Your Gemini API Key to Proceed", type="password", value=st.session_state.gemini_api_key,
-        help="Required to power the AI agents that generate your business plan."
+        "Gemini API Key", type="password",
+        value=st.session_state.gemini_api_key,
+        help="Required for Gemini models. Will default to environment variable if set."
+    )
+    st.session_state.groq_api_key = st.text_input(
+        "Groq API Key", type="password",
+        value=st.session_state.groq_api_key,
+        help="Required for Groq models. Will default to environment variable if set."
     )
 
     if st.button("Login"):
-        if st.session_state.gemini_api_key:
-            # A simple check to see if the key looks plausible.
-            if st.session_state.gemini_api_key.startswith("AIza"):
+        if username in VALID_CREDENTIALS and VALID_CREDENTIALS[username] == password:
+            # Authenticate if both keys are provided (or if they are pre-filled from env)
+            if st.session_state.gemini_api_key and st.session_state.groq_api_key:
                 st.session_state.authenticated = True
                 st.session_state.page = 1
                 st.success("Login successful!")
                 st.rerun()
             else:
-                st.warning("That doesn't look like a valid Gemini API key. Please check it and try again.")
+                st.error("Both Gemini and Groq API keys are required.")
         else:
-            st.error("A Gemini API key is required to use this application.")
+            st.error("Invalid username or password.")
 
-# --- FORM PAGES ---
+# --- FORM PAGES (Simplified for brevity, fill with your questions) ---
 
 def page_one():
     st.header("Part 1: Basic Information and Market Information")
-    st.write("Initially we would like to ask some basic information about the company.")
-    
-    st.session_state.business_name = st.text_input(
-        "What is the name of your company?",
-        placeholder="e.g., EcoFashion",
-        value=st.session_state.business_name
+    st.session_state.business_name = st.text_input("Company Name", st.session_state.business_name)
+    st.session_state.start_year = st.text_input("Establishment Year", st.session_state.start_year)
+    # --- Add all other questions from page 1 ---
+    # Example for legal_structure:
+    st.session_state.legal_structure = st.selectbox(
+        "Legal Structure",
+        options=[None, "Sole Proprietorship", "Partnership", "Corporation", "LLC"],
+        index=0 if st.session_state.legal_structure is None else ([None, "Sole Proprietorship", "Partnership", "Corporation", "LLC"].index(st.session_state.legal_structure) if st.session_state.legal_structure in [None, "Sole Proprietorship", "Partnership", "Corporation", "LLC"] else 0)
     )
-    st.session_state.start_year = st.text_input(
-        "In what year was your company established?",
-        value=st.session_state.start_year
-    )
-    st.session_state.business_reason = st.text_area(
-        "Kindly describe in maximum 500 characters why was your company established!",
-        placeholder="e.g., In order to provide IT security services for small firms...",
-        value=st.session_state.business_reason
-    )
-    st.session_state.mission_vision = st.text_area(
-        "Please state your company's long-term goal or vision!",
-        placeholder="e.g., Our mission is to...",
-        value=st.session_state.mission_vision
-    )
-    st.session_state.legal_structure = st.radio(
-        "What type of business is your company?",
-        options=["Sole proprietorship", "Private limited company", "General partnership", "Limited partnership", "Public limited company", "Association", "Branch of another company", "Non-profit"],
-        index=None if st.session_state.legal_structure is None else ["Sole proprietorship", "Private limited company", "General partnership", "Limited partnership", "Public limited company", "Association", "Branch of another company", "Non-profit"].index(st.session_state.legal_structure)
-    )
+    # Example for financial_funding (multi-select)
+    financial_options = ["Bootstrapped", "Angel Investment", "Venture Capital", "Bank Loan", "Grants"]
     st.session_state.financial_funding = st.multiselect(
-        "How is your company currently financed?",
-        options=["Own financing", "Funding from investors", "Bank loan", "Revenue from sales", "Other"],
+        "Financial Funding",
+        options=financial_options,
         default=st.session_state.financial_funding
     )
-    st.session_state.business_sector = st.radio(
-        "Which industrial sector does your company operate in?",
-        options=["Raw materials (eg mining, steel, trading companies)", "Industrial business (e.g. means of production, transport)", "Services (e.g. commercial and professional services, tourism)", "Durable consumer goods (e.g., furniture, clothing, retail)", "Fast-moving consumer goods (e.g., food, beverages, personal products)", "Healthcare (e.g., healthcare equipment, pharmaceuticals)", "Financial sectors (e.g., banks, insurance)", "Information technology", "Utilities and energy (e.g., water, heat, recycling)", "Culture and leisure (e.g., cultural centre, cinema)"],
-        index=None if st.session_state.business_sector is None else ["Raw materials (eg mining, steel, trading companies)", "Industrial business (e.g. means of production, transport)", "Services (e.g. commercial and professional services, tourism)", "Durable consumer goods (e.g., furniture, clothing, retail)", "Fast-moving consumer goods (e.g., food, beverages, personal products)", "Healthcare (e.g., healthcare equipment, pharmaceuticals)", "Financial sectors (e.g., banks, insurance)", "Information technology", "Utilities and energy (e.g., water, heat, recycling)", "Culture and leisure (e.g., cultural centre, cinema)"].index(st.session_state.business_sector)
+    # Example for business_sector
+    st.session_state.business_sector = st.selectbox(
+        "Business Sector",
+        options=[None, "Technology", "Retail", "Services", "Manufacturing", "Healthcare", "Finance", "Agriculture", "Education", "Other"],
+        index=0 if st.session_state.business_sector is None else ([None, "Technology", "Retail", "Services", "Manufacturing", "Healthcare", "Finance", "Agriculture", "Education", "Other"].index(st.session_state.business_sector) if st.session_state.business_sector in [None, "Technology", "Retail", "Services", "Manufacturing", "Healthcare", "Finance", "Agriculture", "Education", "Other"] else 0)
     )
-    # Conditional questions based on business sector
-    if st.session_state.business_sector == "Raw materials (eg mining, steel, trading companies)":
-        st.session_state.raw_materials_type = st.radio("What type of raw materials business?", options=["Mining", "Textiles and clothing", "Paper and carton", "Chemicals", "Petroleum", "Rubber", "Glass & Ceramics", "Oil", "Steel", "Non-ferrous metals", "Retailers"], index=None if st.session_state.raw_materials_type is None else ["Mining", "Textiles and clothing", "Paper and carton", "Chemicals", "Petroleum", "Rubber", "Glass & Ceramics", "Oil", "Steel", "Non-ferrous metals", "Retailers"].index(st.session_state.raw_materials_type))
-    # ... (all other conditional questions from frontend.py)
-    
-    st.session_state.primary_countries = st.text_area(
-        "Please specify which country your company's primary market will be in the short-term (1-2 years).",
-        value=st.session_state.primary_countries
+    st.session_state.business_reason = st.text_area("Reason for Business", st.session_state.business_reason)
+    st.session_state.mission_vision = st.text_area("Mission & Vision", st.session_state.mission_vision)
+    st.session_state.product_service_description = st.text_area("Product/Service Description", st.session_state.product_service_description)
+    st.session_state.primary_countries = st.text_input("Primary Countries of Operation", st.session_state.primary_countries)
+    st.session_state.product_centralisation = st.selectbox(
+        "Product/Service Centralization",
+        options=[None, "Centralized", "Decentralized"],
+        index=0 if st.session_state.product_centralisation is None else ([None, "Centralized", "Decentralized"].index(st.session_state.product_centralisation) if st.session_state.product_centralisation in [None, "Centralized", "Decentralized"] else 0)
     )
-    st.session_state.product_centralisation = st.radio(
-        "Is product/service development centralized or decentralized?",
-        options=["Centralized", "Decentralized"],
-        index=None if st.session_state.product_centralisation is None else ["Centralized", "Decentralized"].index(st.session_state.product_centralisation)
+    st.session_state.product_range = st.selectbox(
+        "Product Range",
+        options=[None, "Narrow", "Broad"],
+        index=0 if st.session_state.product_range is None else ([None, "Narrow", "Broad"].index(st.session_state.product_range) if st.session_state.product_range in [None, "Narrow", "Broad"] else 0)
     )
-    st.session_state.product_range = st.radio(
-        "Please specify what characterizes the product range of your company:",
-        options=["Single product category", "Multiple related product categories", "Multiple unrelated product categories"],
-        index=None if st.session_state.product_range is None else ["Single product category", "Multiple related product categories", "Multiple unrelated product categories"].index(st.session_state.product_range)
-    )
-    st.session_state.end_consumer_characteristics = st.radio(
-        "Please specify what characterizes the groups of end-consumers:",
-        options=["One specific customer group", "Several specific customer groups", "Several unspecific customer groups"],
-        index=None if st.session_state.end_consumer_characteristics is None else ["One specific customer group", "Several specific customer groups", "Several unspecific customer groups"].index(st.session_state.end_consumer_characteristics)
-    )
+    st.session_state.end_consumer_characteristics = st.text_area("End Consumer Characteristics (e.g., age, income, lifestyle)", st.session_state.end_consumer_characteristics)
+    consumer_characteristics_2_options = ["B2B", "B2C", "Government", "Non-profit"]
     st.session_state.end_consumer_characteristics_2 = st.multiselect(
-        "Please specify what characterizes the groups of end-consumers:",
-        options=["End-consumers are primarily private individuals", "End-consumers are primarily companies", "End-consumers are primarily public institutions", "End-consumers are primarily non-profit organizations"],
+        "End Consumer Target Group",
+        options=consumer_characteristics_2_options,
         default=st.session_state.end_consumer_characteristics_2
-    )
-    st.session_state.product_service_description = st.text_area(
-        "Please write maximum 500 characters about the products or services that the company offers.",
-        placeholder="e.g., The company provides security services...",
-        value=st.session_state.product_service_description
     )
 
 def page_two():
-    st.header("Part 2: Segmentation and Revenue")
-    st.write("In this section we would like to gather information about the products/services the company offers and about your most relevant customer segment.")
-    
-    st.session_state.segment_name = st.text_input("Name of your most relevant customer segment:", value=st.session_state.segment_name)
-    st.session_state.segment_demographics = st.text_area("Demographics of this customer segment:", value=st.session_state.segment_demographics)
-    st.session_state.segment_characteristics = st.text_area("Characteristics of this customer segment:", value=st.session_state.segment_characteristics)
-    st.session_state.customer_count = st.text_input("How many customers does this segment have?", value=st.session_state.customer_count)
-    st.session_state.problems_faced = st.text_area("Please briefly describe the problems or challenges that your company is trying to solve for the customer group:", value=st.session_state.problems_faced)
-    st.session_state.biggest_competitors = st.text_area("Please indicate and name the three biggest competitors:", value=st.session_state.biggest_competitors)
-    st.session_state.competition_intensity = st.radio("Please indicate the intensity of the competition in the market:", options=["Low", "Medium", "High"], index=None if not st.session_state.competition_intensity else ["Low", "Medium", "High"].index(st.session_state.competition_intensity))
-    st.session_state.price_comparison = st.radio("How are the prices of your company's products/services compared to competitors?", options=["Significantly lower", "Similar", "Significantly higher"], index=None if not st.session_state.price_comparison else ["Significantly lower", "Similar", "Significantly higher"].index(st.session_state.price_comparison))
-    st.session_state.market_type = st.radio("Is the market best described as a niche market or a mass market?", options=["Niche market", "Mass market"], index=None if not st.session_state.market_type else ["Niche market", "Mass market"].index(st.session_state.market_type))
-    # ... (all other questions from frontend.py for page 2)
+    st.header("Part 2: Segmentation, Revenue and Customer Relations")
+    st.session_state.segment_name = st.text_input("Most Relevant Customer Segment", st.session_state.segment_name)
+    st.session_state.segment_demographics = st.text_area("Segment Demographics", st.session_state.segment_demographics)
+    st.session_state.segment_characteristics = st.text_area("Segment Characteristics", st.session_state.segment_characteristics)
+    st.session_state.customer_count = st.text_input("Estimated Customer Count", st.session_state.customer_count)
+    st.session_state.problems_faced = st.text_area("Customer Problems Solved", st.session_state.problems_faced)
+    st.session_state.biggest_competitors = st.text_area("Biggest Competitors", st.session_state.biggest_competitors)
+    st.session_state.competition_intensity = st.selectbox(
+        "Competition Intensity",
+        options=[None, "Low", "Medium", "High"],
+        index=0 if st.session_state.competition_intensity is None else ([None, "Low", "Medium", "High"].index(st.session_state.competition_intensity) if st.session_state.competition_intensity in [None, "Low", "Medium", "High"] else 0)
+    )
+    st.session_state.price_comparison = st.selectbox(
+        "Price Comparison to Competitors",
+        options=[None, "Lower", "Similar", "Higher"],
+        index=0 if st.session_state.price_comparison is None else ([None, "Lower", "Similar", "Higher"].index(st.session_state.price_comparison) if st.session_state.price_comparison in [None, "Lower", "Similar", "Higher"] else 0)
+    )
+    st.session_state.market_type = st.selectbox(
+        "Market Type",
+        options=[None, "Niche", "Mass Market", "Diversified"],
+        index=0 if st.session_state.market_type is None else ([None, "Niche", "Mass Market", "Diversified"].index(st.session_state.market_type) if st.session_state.market_type in [None, "Niche", "Mass Market", "Diversified"] else 0)
+    )
+    competitive_params_options = ["Price", "Quality", "Innovation", "Customer Service", "Brand Reputation"]
+    st.session_state.competitive_parameters = st.multiselect(
+        "Key Competitive Parameters",
+        options=competitive_params_options,
+        default=st.session_state.competitive_parameters
+    )
+    value_props_options = ["Cost Reduction", "Performance Improvement", "Customization", "Newness", "Design"]
+    st.session_state.value_propositions = st.multiselect(
+        "Value Propositions",
+        options=value_props_options,
+        default=st.session_state.value_propositions
+    )
+    st.session_state.direct_income = st.selectbox(
+        "Primary Income Source",
+        options=[None, "Direct Sales", "Subscriptions", "Licensing", "Advertising", "Consulting"],
+        index=0 if st.session_state.direct_income is None else ([None, "Direct Sales", "Subscriptions", "Licensing", "Advertising", "Consulting"].index(st.session_state.direct_income) if st.session_state.direct_income in [None, "Direct Sales", "Subscriptions", "Licensing", "Advertising", "Consulting"] else 0)
+    )
+    revenue_stream_options = ["Asset Sale", "Usage Fee", "Subscription Fees", "Lending/Renting/Leasing", "Licensing", "Brokerage Fees", "Advertising"]
+    st.session_state.primary_revenue = st.multiselect(
+        "Primary Revenue Streams",
+        options=revenue_stream_options,
+        default=st.session_state.primary_revenue
+    )
+    one_time_payment_options = ["Product Purchase", "Consulting Project", "License Fee (one-time)"]
+    st.session_state.one_time_payments = st.multiselect(
+        "One-Time Payment Characteristics",
+        options=one_time_payment_options,
+        default=st.session_state.one_time_payments
+    )
+    ongoing_payment_options = ["Subscription", "Maintenance Fee", "Usage-based Billing"]
+    st.session_state.ongoing_payments = st.multiselect(
+        "Ongoing Payment Characteristics",
+        options=ongoing_payment_options,
+        default=st.session_state.ongoing_payments
+    )
+    payment_char_options = ["Fixed Price", "Dynamic Price (negotiation)", "Usage-based", "Volume-dependent"]
+    st.session_state.payment_characteristics = st.multiselect(
+        "General Payment Characteristics",
+        options=payment_char_options,
+        default=st.session_state.payment_characteristics
+    )
+    st.session_state.package_price = st.selectbox(
+        "Pricing Strategy",
+        options=[None, "Fixed Package Price", "Tiered Pricing", "Custom Quotes"],
+        index=0 if st.session_state.package_price is None else ([None, "Fixed Package Price", "Tiered Pricing", "Custom Quotes"].index(st.session_state.package_price) if st.session_state.package_price in [None, "Fixed Package Price", "Tiered Pricing", "Custom Quotes"] else 0)
+    )
+    st.session_state.price_negotiation = st.selectbox(
+        "Price Negotiation",
+        options=[None, "Yes", "No"],
+        index=0 if st.session_state.price_negotiation is None else ([None, "Yes", "No"].index(st.session_state.price_negotiation) if st.session_state.price_negotiation in [None, "Yes", "No"] else 0)
+    )
+    fixed_price_options = ["List Price", "Product Feature Dependent", "Customer Segment Dependent", "Volume Dependent"]
+    st.session_state.fixed_prices = st.multiselect(
+        "Fixed Price Types",
+        options=fixed_price_options,
+        default=st.session_state.fixed_prices
+    )
+    dynamic_price_options = ["Negotiation (with customer)", "Yield Management", "Real-time Market", "Auction"]
+    st.session_state.dynamic_prices = st.multiselect(
+        "Dynamic Price Types",
+        options=dynamic_price_options,
+        default=st.session_state.dynamic_prices
+    )
+    distribution_options = ["Direct Sales", "Online Store", "Retail Partners", "Wholesalers", "Affiliates"]
+    st.session_state.distribution_channels = st.multiselect(
+        "Distribution Channels",
+        options=distribution_options,
+        default=st.session_state.distribution_channels
+    )
+    st.session_state.purchasing_power = st.selectbox(
+        "Target Customer Purchasing Power",
+        options=[None, "Low", "Medium", "High"],
+        index=0 if st.session_state.purchasing_power is None else ([None, "Low", "Medium", "High"].index(st.session_state.purchasing_power) if st.session_state.purchasing_power in [None, "Low", "Medium", "High"] else 0)
+    )
+    product_char_options = ["New features", "Design changes", "Performance upgrades", "Cost optimization"]
+    st.session_state.product_related_characteristics = st.multiselect(
+        "Product/Service Related Characteristics",
+        options=product_char_options,
+        default=st.session_state.product_related_characteristics
+    )
+    st.session_state.self_service_availability = st.selectbox(
+        "Self-Service Availability",
+        options=[None, "Yes", "No", "Partial"],
+        index=0 if st.session_state.self_service_availability is None else ([None, "Yes", "No", "Partial"].index(st.session_state.self_service_availability) if st.session_state.self_service_availability in [None, "Yes", "No", "Partial"] else 0)
+    )
+    st.session_state.online_communities_presence = st.selectbox(
+        "Online Communities Presence",
+        options=[None, "Yes", "No"],
+        index=0 if st.session_state.online_communities_presence is None else ([None, "Yes", "No"].index(st.session_state.online_communities_presence) if st.session_state.online_communities_presence in [None, "Yes", "No"] else 0)
+    )
+    st.session_state.development_process_customer_involvement = st.selectbox(
+        "Customer Involvement in Development",
+        options=[None, "Yes", "No", "Indirect"],
+        index=0 if st.session_state.development_process_customer_involvement is None else ([None, "Yes", "No", "Indirect"].index(st.session_state.development_process_customer_involvement) if st.session_state.development_process_customer_involvement in [None, "Yes", "No", "Indirect"] else 0)
+    )
+    st.session_state.after_sale_purchases = st.selectbox(
+        "After-Sale Purchases/Upsells",
+        options=[None, "Yes", "No"],
+        index=0 if st.session_state.after_sale_purchases is None else ([None, "Yes", "No"].index(st.session_state.after_sale_purchases) if st.session_state.after_sale_purchases in [None, "Yes", "No"] else 0)
+    )
+    st.session_state.personal_assistance_offered = st.selectbox(
+        "Personal Assistance Offered",
+        options=[None, "Yes", "No"],
+        index=0 if st.session_state.personal_assistance_offered is None else ([None, "Yes", "No"].index(st.session_state.personal_assistance_offered) if st.session_state.personal_assistance_offered in [None, "Yes", "No"] else 0)
+    )
+    st.session_state.similar_products_switch = st.selectbox(
+        "Ease for Customers to Switch to Similar Products",
+        options=[None, "Easy", "Moderate", "Difficult"],
+        index=0 if st.session_state.similar_products_switch is None else ([None, "Easy", "Moderate", "Difficult"].index(st.session_state.similar_products_switch) if st.session_state.similar_products_switch in [None, "Easy", "Moderate", "Difficult"] else 0)
+    )
+    st.session_state.general_customer_relation = st.selectbox(
+        "General Customer Relation Type",
+        options=[None, "Transactional", "Long-term", "Community-based"],
+        index=0 if st.session_state.general_customer_relation is None else ([None, "Transactional", "Long-term", "Community-based"].index(st.session_state.general_customer_relation) if st.session_state.general_customer_relation in [None, "Transactional", "Long-term", "Community-based"] else 0)
+    )
+
 
 def page_three():
     st.header("Part 3: Resources, Partners, and Team")
-    st.write("We still look at your company from the inside out and would like to gain insight into the key resources for creating and capturing value.")
-
+    st.session_state.team_members = st.text_area("Team Members and Competencies", st.session_state.team_members)
+    # --- Add all other questions from page 3 ---
+    material_resources_options = ["Physical Assets", "Inventory", "Manufacturing Facilities", "Vehicles"]
     st.session_state.material_resources = st.multiselect(
-        "Please select the three most important material resources for your company:",
-        options=["Liquid funds", "Financial guarantees", "Inventory", "Location", "Logistic infrastructure", "Manufacturing/production facilities", "Own physical stores/shops", "Means of transport", "Technologies"],
-        default=st.session_state.material_resources, max_selections=3
+        "Material Resources",
+        options=material_resources_options,
+        default=st.session_state.material_resources
     )
+    intangible_resources_options = ["Brand", "Patents", "Copyrights", "Software", "Knowledge", "Partnerships"]
     st.session_state.intangible_resources = st.multiselect(
-        "Please select the three most important intangible resources:",
-        options=["Brand(s)", "Customer relations", "Distribution network", "Knowledge/know-how", "Image and reputation", "Digital technologies", "Intellectual property", "Partnerships", "Human resources"],
-        default=st.session_state.intangible_resources, max_selections=3
+        "Intangible Resources",
+        options=intangible_resources_options,
+        default=st.session_state.intangible_resources
     )
-    # ... (all other questions from frontend.py for page 3)
-    
-    st.session_state.team_members = st.text_area(
-        "Team Members and Competencies",
-        value=st.session_state.team_members,
-        placeholder="Please describe your team members, their positions, and core competencies..."
+    important_activities_options = ["Production", "Problem Solving", "Platform/Network Management", "Supply Chain Management", "Marketing", "R&D"]
+    st.session_state.important_activities = st.multiselect(
+        "Important Activities",
+        options=important_activities_options,
+        default=st.session_state.important_activities
     )
-    st.session_state.funding_amount = st.text_input(
-        "If applying for funding, please specify the amount (in Danish Kroner):",
-        placeholder="e.g., 1000000",
-        value=st.session_state.funding_amount
+    inhouse_activities_options = ["Core Product Development", "Customer Support", "Strategic Planning", "Sales"]
+    st.session_state.inhouse_activities = st.multiselect(
+        "In-house Activities",
+        options=inhouse_activities_options,
+        default=st.session_state.inhouse_activities
     )
-    if st.session_state.funding_amount:
-        st.session_state.funding_purpose = st.text_area(
-            "Please describe how you plan to use the requested funding:",
-            value=st.session_state.funding_purpose
-        )
+    outsourced_activities_options = ["Manufacturing", "IT Support", "Logistics", "Marketing Campaigns", "HR"]
+    st.session_state.outsourced_activities = st.multiselect(
+        "Outsourced Activities",
+        options=outsourced_activities_options,
+        default=st.session_state.outsourced_activities
+    )
+    company_statements_options = ["Vision Statement", "Mission Statement", "Values Statement", "Unique Selling Proposition"]
+    st.session_state.company_statements = st.multiselect(
+        "Company Statements",
+        options=company_statements_options,
+        default=st.session_state.company_statements
+    )
+    st.session_state.important_strategic_partners = st.text_area("Important Strategic Partners", st.session_state.important_strategic_partners)
+    partnership_benefits_options = ["Optimization & Economy", "Reduction of Risk & Uncertainty", "Acquisition of Particular Resources & Activities"]
+    st.session_state.partnership_benefits = st.multiselect(
+        "Partnership Benefits",
+        options=partnership_benefits_options,
+        default=st.session_state.partnership_benefits
+    )
+    st.session_state.other_benefit = st.text_area("Other Partnership Benefits (if any)", st.session_state.other_benefit)
+    st.session_state.company_dependency = st.selectbox(
+        "Company Dependency on Key Partners",
+        options=[None, "Low", "Medium", "High"],
+        index=0 if st.session_state.company_dependency is None else ([None, "Low", "Medium", "High"].index(st.session_state.company_dependency) if st.session_state.company_dependency in [None, "Low", "Medium", "High"] else 0)
+    )
+    cost_intensive_components_options = ["Raw Materials", "Labor", "Technology", "Marketing", "Distribution"]
+    st.session_state.cost_intensive_components = st.multiselect(
+        "Most Cost-Intensive Components",
+        options=cost_intensive_components_options,
+        default=st.session_state.cost_intensive_components
+    )
+    st.session_state.funding_amount = st.text_input("Required Funding Amount", st.session_state.funding_amount)
+    st.session_state.funding_purpose = st.text_area("Purpose of Funding", st.session_state.funding_purpose)
+
 
     # "Generate" button is on the final page
     if st.button("Generate Business Plan"):
@@ -214,17 +358,17 @@ def generate_business_plan():
     """Collects data from session_state and calls the backend API."""
     with st.spinner("🧠 Generating your business plan... This may take a few minutes."):
         try:
-            # This is the URL of your deployed backend service on Render
-            # It's best practice to set this as an Environment Variable in Render
+            # Get the backend URL from environment variables.
             backend_url = os.getenv("BACKEND_URL")
             if not backend_url:
-                st.error("Configuration error: BACKEND_URL is not set.")
+                st.error("Configuration error: BACKEND_URL is not set. Please set it in Render environment variables or your local .env file.")
                 return
 
             # Collect all form data from session state
-            data = {key: st.session_state[key] for key in st.session_state if key not in ['page', 'authenticated', 'gemini_api_key']}
-            # Also include the API key for the backend to use
+            data = {key: st.session_state[key] for key in st.session_state if key not in ['page', 'authenticated']}
+            # Ensure both API keys are passed to the backend
             data['gemini_api_key'] = st.session_state.gemini_api_key
+            data['groq_api_key'] = st.session_state.groq_api_key
 
 
             response = requests.post(
